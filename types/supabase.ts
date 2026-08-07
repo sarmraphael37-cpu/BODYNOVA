@@ -20,6 +20,8 @@ import type {
   AiInsight,
   ProgressReport,
   AuditLog,
+  PasswordReset,
+  AuthUser,
 } from "./database";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -55,6 +57,24 @@ export type Database = {
       ai_insights: Row<AiInsight>;
       progress_reports: Row<ProgressReport>;
       audit_logs: Row<AuditLog>;
+      password_resets: Row<PasswordReset>;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+  auth: {
+    Tables: {
+      users: Row<AuthUser>;
     };
     Views: {
       [_ in never]: never;

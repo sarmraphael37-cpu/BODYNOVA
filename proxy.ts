@@ -3,10 +3,12 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 const protectedAppPaths = ["/app", "/onboarding"];
 const adminPaths = ["/admin"];
-const authPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
+// /reset-password is intentionally NOT here: the code-based reset flow is
+// reachable without a session, so it must never be bounced to the dashboard.
+const authPaths = ["/login", "/register", "/forgot-password"];
 
 export async function proxy(request: NextRequest) {
-  const response = await updateSession(request);
+  const { response, authenticated } = await updateSession(request);
 
   const { pathname } = request.nextUrl;
   const isAppRoute = protectedAppPaths.some(
@@ -16,29 +18,28 @@ export async function proxy(request: NextRequest) {
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
   const isAuthRoute = authPaths.includes(pathname);
+  const isAdminLogin = pathname === "/admin/login";
 
-  // Need to know if the user has a session. The anon JWT alone doesn't tell
-  // us, so check for any Supabase session cookie. The cookie name is
-  // `sb-<project-ref>-auth-token`, and the project ref is not known here.
-  const hasSessionCookie = request.cookies
-    .getAll()
-    .some((cookie) => /^sb-.+-auth-token/.test(cookie.name));
-
-  if (isAppRoute && !hasSessionCookie) {
+  // `authenticated` comes from `getUser()`, which validates the session. A
+  // stale cookie alone no longer counts, so an invalid session can't bounce
+  // between an auth page and a protected page in an infinite redirect loop.
+  if (isAppRoute && !authenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (isAdminRoute && !hasSessionCookie) {
+  // Admins use a dedicated sign-in page. /admin/login itself is always
+  // reachable; it decides where to send the visitor based on their session.
+  if (isAdminRoute && !isAdminLogin && !authenticated) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (isAuthRoute && hasSessionCookie) {
+  if (isAuthRoute && authenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/app/dashboard";
     return NextResponse.redirect(url);

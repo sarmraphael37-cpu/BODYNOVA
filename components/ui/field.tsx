@@ -8,7 +8,7 @@ import { cn } from "@/utils/cn";
 interface FieldWrapperProps {
   label: string;
   htmlFor?: string;
-  error?: FieldError;
+  error?: string | FieldError;
   hint?: string;
   className?: string;
   children: React.ReactNode;
@@ -31,7 +31,7 @@ export function FieldWrapper({
       )}
       {error && (
         <p role="alert" className="text-xs font-medium text-destructive">
-          {error.message}
+          {typeof error === "string" ? error : error.message}
         </p>
       )}
     </div>

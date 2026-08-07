@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Workouts",
+  description: "Your workout history and recent sessions.",
 };
 
 export default async function WorkoutsPage() {

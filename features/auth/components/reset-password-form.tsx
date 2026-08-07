@@ -1,71 +1,72 @@
 "use client";
 
 import { useActionState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "@/components/ui/field";
-import {
-  resetPasswordSchema,
-  type ResetPasswordInput,
-} from "@/features/auth/schemas";
+import { IconInput } from "@/features/auth/components/icon-input";
+import { PasswordInput } from "@/features/auth/components/password-input";
 import {
   resetPasswordAction,
   type AuthActionState,
 } from "@/features/auth/actions";
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ email }: { email: string }) {
   const [state, formAction, pending] = useActionState<AuthActionState, FormData>(
     resetPasswordAction,
     {}
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ResetPasswordInput>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { password: "", confirmPassword: "" },
-  });
+  const fieldErrors = state.fieldErrors;
 
   return (
-    <form
-      action={formAction}
-      onSubmit={handleSubmit(() => undefined)}
-      className="grid gap-4"
-      noValidate
-    >
+    <form action={formAction} className="grid gap-4" noValidate>
+      <input type="hidden" name="email" value={email} />
+
+      <FieldWrapper
+        label="Reset code"
+        htmlFor="code"
+        error={fieldErrors?.code?.[0]}
+        hint="Enter the 6-digit code we emailed you."
+      >
+        <IconInput
+          id="code"
+          name="code"
+          icon={KeyRound}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          placeholder="000000"
+          aria-invalid={Boolean(fieldErrors?.code)}
+        />
+      </FieldWrapper>
+
       <FieldWrapper
         label="New password"
         htmlFor="password"
-        error={errors.password}
+        error={fieldErrors?.password?.[0]}
         hint="At least 8 characters, including a letter and a number."
       >
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
+          name="password"
           autoComplete="new-password"
           placeholder="••••••••"
-          aria-invalid={Boolean(errors.password)}
-          {...register("password")}
+          aria-invalid={Boolean(fieldErrors?.password)}
         />
       </FieldWrapper>
 
       <FieldWrapper
         label="Confirm new password"
         htmlFor="confirmPassword"
-        error={errors.confirmPassword}
+        error={fieldErrors?.confirmPassword?.[0]}
       >
-        <Input
+        <PasswordInput
           id="confirmPassword"
-          type="password"
+          name="confirmPassword"
           autoComplete="new-password"
           placeholder="••••••••"
-          aria-invalid={Boolean(errors.confirmPassword)}
-          {...register("confirmPassword")}
+          aria-invalid={Boolean(fieldErrors?.confirmPassword)}
         />
       </FieldWrapper>
 

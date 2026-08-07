@@ -336,3 +336,21 @@ export type AuditLog = {
   ip: string | null;
   created_at: string;
 }
+
+export type PasswordReset = {
+  id: string;
+  user_id: string;
+  email: string;
+  code_hash: string;
+  code_salt: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+}
+
+export type AuthUser = {
+  id: string;
+  email: string | null;
+  email_confirmed_at: string | null;
+  created_at: string;
+}

@@ -1,8 +1,65 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/dal/auth";
+import { isAdmin, requireAdmin } from "@/lib/dal/auth";
+import { loginSchema } from "@/features/auth/schemas";
+
+export type AdminLoginActionState = {
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+};
+
+export async function adminLoginAction(
+  _state: AdminLoginActionState,
+  formData: FormData
+): Promise<AdminLoginActionState> {
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const { email, password } = parsed.data;
+  const supabase = await createClient();
+
+  let signInError: { code?: string; message?: string } | null = null;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    signInError = error;
+  } catch (unexpectedError) {
+    console.error("[admin] signInWithPassword threw", unexpectedError);
+    return {
+      error:
+        "Unable to reach the sign-in service. Check your connection and try again.",
+    };
+  }
+
+  if (signInError) {
+    if (
+      signInError.code === "email_not_confirmed" ||
+      /not confirmed/i.test(signInError.message ?? "")
+    ) {
+      return {
+        error:
+          "Your email isn't confirmed yet. Check your inbox (and spam folder) for the confirmation link, then sign in again.",
+      };
+    }
+    return { error: "Invalid email or password." };
+  }
+
+  const admin = await isAdmin();
+  if (!admin) {
+    await supabase.auth.signOut();
+    return { error: "This account doesn't have administrator access." };
+  }
+
+  redirect("/admin/dashboard");
+}
 
 export async function toggleExerciseStatusAction(exerciseId: string): Promise<void> {
   const user = await requireAdmin();

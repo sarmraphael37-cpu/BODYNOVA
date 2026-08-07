@@ -32,7 +32,7 @@ export default async function WeightPage() {
     getLatestWeight(),
   ]);
 
-  const start = entries.length > 0 ? entries[0].weight_kg : null;
+  const start = entries.length > 0 ? entries[entries.length - 1].weight_kg : null;
   const totalChange = latest !== null && start !== null ? latest - start : null;
 
   return (

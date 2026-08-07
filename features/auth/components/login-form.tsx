@@ -2,16 +2,11 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "@/components/ui/field";
-import {
-  loginSchema,
-  type LoginInput,
-} from "@/features/auth/schemas";
+import { IconInput } from "@/features/auth/components/icon-input";
+import { PasswordInput } from "@/features/auth/components/password-input";
 import { loginAction, type AuthActionState } from "@/features/auth/actions";
 
 export function LoginForm() {
@@ -20,49 +15,33 @@ export function LoginForm() {
     {}
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
-  });
+  const fieldErrors = state.fieldErrors;
 
   return (
-    <form
-      action={formAction}
-      onSubmit={handleSubmit(() => undefined)}
-      className="grid gap-4"
-      noValidate
-    >
-      <FieldWrapper
-        label="Email"
-        htmlFor="email"
-        error={errors.email}
-      >
-        <Input
+    <form action={formAction} className="grid gap-4" noValidate>
+      <FieldWrapper label="Email" htmlFor="email" error={fieldErrors?.email?.[0]}>
+        <IconInput
           id="email"
+          name="email"
           type="email"
+          icon={Mail}
           autoComplete="email"
           placeholder="you@example.com"
-          aria-invalid={Boolean(errors.email)}
-          {...register("email")}
+          aria-invalid={Boolean(fieldErrors?.email)}
         />
       </FieldWrapper>
 
       <FieldWrapper
         label="Password"
         htmlFor="password"
-        error={errors.password}
+        error={fieldErrors?.password?.[0]}
       >
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
+          name="password"
           autoComplete="current-password"
           placeholder="••••••••"
-          aria-invalid={Boolean(errors.password)}
-          {...register("password")}
+          aria-invalid={Boolean(fieldErrors?.password)}
         />
       </FieldWrapper>
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Target } from "lucide-react";
 import { requireProfile } from "@/lib/dal/auth";
-import { getGoals } from "@/features/goals/queries";
+import { getGoalsWithProgress } from "@/features/goals/queries";
 import { deleteGoalAction } from "@/features/goals/actions";
 import { goalTypeOptions } from "@/features/goals/schemas";
 import { GoalForm } from "@/features/goals/components/goal-form";
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Goals",
+  description: "Set targets and track your progress.",
 };
 
 const statusBadgeVariant: Record<
@@ -41,7 +42,7 @@ function typeLabel(type: GoalType): string {
 
 export default async function GoalsPage() {
   await requireProfile();
-  const goals = await getGoals();
+  const goals = await getGoalsWithProgress();
 
   return (
     <div className="grid gap-6">
@@ -92,9 +93,11 @@ export default async function GoalsPage() {
                       Started {formatDate(goal.start_date)}
                     </span>
                   </div>
-                  <Progress value={0} />
+                  <Progress value={goal.percent} />
                   <p className="text-xs text-muted-foreground">
-                    Track progress in your daily logs.
+                    {goal.current_value != null
+                      ? `Current ${formatNumber(goal.current_value)}${goal.unit ? ` ${goal.unit}` : ""} · ${goal.percent}% of target`
+                      : "Log data to track progress."}
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     {goal.status === "active" && (

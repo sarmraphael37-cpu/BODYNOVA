@@ -26,9 +26,22 @@ export default async function ForgotPasswordPage({
           <p className="text-sm text-muted-foreground">
             If an account exists for{" "}
             <span className="font-medium text-foreground">{email}</span>, we&apos;ve
-            sent a password reset link. Check your inbox and spam folder.
+            sent a 6-digit reset code. Check your inbox and spam folder — the code
+            expires in 15 minutes.
           </p>
         </div>
+        <Link
+          href={`/reset-password?email=${encodeURIComponent(email ?? "")}`}
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          Enter the code
+        </Link>
+        <Link
+          href="/forgot-password"
+          className="text-sm font-medium text-muted-foreground hover:underline"
+        >
+          Resend code
+        </Link>
         <Link
           href="/login"
           className="text-sm font-medium text-primary hover:underline"
@@ -44,7 +57,7 @@ export default async function ForgotPasswordPage({
       <div className="grid gap-2 text-center">
         <h1 className="text-2xl font-bold tracking-tight">Reset your password</h1>
         <p className="text-sm text-muted-foreground">
-          Enter your email and we&apos;ll send you a reset link.
+          Enter your email and we&apos;ll send you a 6-digit reset code.
         </p>
       </div>
       <ForgotPasswordForm />

@@ -7,7 +7,7 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   if (!isSupabaseConfigured()) {
-    return supabaseResponse;
+    return { response: supabaseResponse, authenticated: false };
   }
 
   const supabase = createServerClient<Database>(
@@ -31,9 +31,12 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh the session if it has expired. Errors are intentionally ignored:
-  // unauthenticated users are handled by route protection.
-  await supabase.auth.getUser();
+  // Refresh the session if it has expired. Stale cookies are cleared through
+  // setAll above, so `authenticated` reflects the real session, not just the
+  // presence of a cookie.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return { response: supabaseResponse, authenticated: user !== null };
 }

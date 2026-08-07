@@ -1,114 +1,152 @@
 "use client";
 
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Droplets, Footprints, Flame, Scale, Dumbbell, Plus } from "lucide-react";
-import type { DashboardData } from "@/features/dashboard/queries";
-import { StatCard } from "@/components/ui/stat-card";
-import { ChartCard } from "@/components/ui/chart-card";
+import { Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { ChartCard } from "@/components/ui/chart-card";
+import { DashboardMotion } from "@/features/dashboard/components/dashboard-motion";
+import { DashboardHeader } from "@/features/dashboard/components/dashboard-header";
+import { KpiGrid } from "@/features/dashboard/components/kpi-grid";
+import { DailyGoals } from "@/features/dashboard/components/daily-goals";
+import { BodyMetricsCard } from "@/features/dashboard/components/body-metrics-card";
 import { WeightChart } from "@/features/dashboard/components/weight-chart";
 import { WorkoutChart } from "@/features/dashboard/components/workout-chart";
-import { formatKg, formatMinutes, formatMl, formatNumber } from "@/utils/format";
+import { SleepCard } from "@/features/dashboard/components/sleep-card";
+import { ActivityCard } from "@/features/dashboard/components/activity-card";
+import { NutritionCard } from "@/features/dashboard/components/nutrition-card";
+import { DailyCoach } from "@/features/dashboard/components/daily-coach";
+import { ConsistencyCard } from "@/features/dashboard/components/consistency-card";
+import { AchievementsPanel } from "@/features/dashboard/components/achievements-panel";
+import { GoalsCard } from "@/features/dashboard/components/goals-card";
+import { RecentActivity } from "@/features/dashboard/components/recent-activity";
+import { QuickAddDialog } from "@/features/dashboard/components/quick-add-dialog";
+import type { DashboardData } from "@/features/dashboard/queries";
 
 interface DashboardContentProps {
   data: DashboardData;
-  profileName: string;
+  greeting: string;
+  dateLabel: string;
+  initialQuickAdd?: boolean;
 }
 
-export function DashboardContent({ data, profileName }: DashboardContentProps) {
-  const { summary, weightTrend, workoutTrend } = data;
-  const firstName = profileName.split(" ")[0];
+export function DashboardContent({
+  data,
+  greeting,
+  dateLabel,
+  initialQuickAdd = false,
+}: DashboardContentProps) {
+  const router = useRouter();
+  const [quickOpen, setQuickOpen] = React.useState(initialQuickAdd);
 
-  const waterPercent = Math.min(100, Math.round((summary.waterMl / summary.waterTargetMl) * 100));
-  const stepPercent = Math.min(100, Math.round((summary.steps / summary.stepTarget) * 100));
+  function handleQuickAddChange(open: boolean) {
+    setQuickOpen(open);
+    if (!open && initialQuickAdd) {
+      router.replace("/app/dashboard", { scroll: false });
+    }
+  }
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <DashboardMotion>
+        <DashboardHeader
+          firstName={data.firstName}
+          greeting={greeting}
+          dateLabel={dateLabel}
+          primaryGoal={data.primaryGoal}
+          onQuickAdd={() => setQuickOpen(true)}
+        />
+      </DashboardMotion>
+
+      <DashboardMotion delay={0.05}>
+        <KpiGrid data={data} />
+      </DashboardMotion>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <DashboardMotion delay={0.1} className="lg:col-span-2">
+          <DailyGoals summary={data.summary} />
+        </DashboardMotion>
+        <DashboardMotion delay={0.15}>
+          <BodyMetricsCard
+            bmi={data.bmi}
+            lastWeight={data.lastWeight}
+            lastBodyFat={data.lastBodyFat}
+            weightChangeKg={data.weightChangeKg}
+          />
+        </DashboardMotion>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DashboardMotion delay={0.1}>
+          <ChartCard title="Weight trend" description="Your logged weight over time">
+            <WeightChart data={data.weightTrend} />
+          </ChartCard>
+        </DashboardMotion>
+        <DashboardMotion delay={0.15}>
+          <ChartCard
+            title="Workouts"
+            description="Workouts over the last 30 days"
+            action={
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/app/workouts">View all</Link>
+              </Button>
+            }
+          >
+            <WorkoutChart data={data.workoutTrend} />
+          </ChartCard>
+        </DashboardMotion>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <DashboardMotion delay={0.1}>
+          <SleepCard data={data.sleepTrend} />
+        </DashboardMotion>
+        <DashboardMotion delay={0.15}>
+          <ActivityCard data={data.activityTrend} todaySteps={data.summary.steps} />
+        </DashboardMotion>
+        <DashboardMotion delay={0.2}>
+          <NutritionCard data={data.nutrition} calorieTarget={data.calorieTarget} />
+        </DashboardMotion>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <DashboardMotion delay={0.1} className="lg:col-span-2">
+          <DailyCoach insights={data.insights} />
+        </DashboardMotion>
+        <DashboardMotion delay={0.15}>
+          <ConsistencyCard value={data.consistency} />
+        </DashboardMotion>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <DashboardMotion delay={0.1}>
+          <AchievementsPanel data={data.achievements} />
+        </DashboardMotion>
+        <DashboardMotion delay={0.15}>
+          <GoalsCard goals={data.goals} />
+        </DashboardMotion>
+        <DashboardMotion delay={0.2}>
+          <RecentActivity items={data.recentActivity} />
+        </DashboardMotion>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {firstName || "athlete"}
-          </h1>
+          <p className="text-sm font-medium">Ready for your next session?</p>
           <p className="text-sm text-muted-foreground">
-            Here&apos;s what&apos;s happening with your body today.
+            Log a full workout with sets, reps, and weights.
           </p>
         </div>
         <Button asChild>
           <Link href="/app/workouts/new">
-            <Plus className="mr-2 h-4 w-4" aria-hidden />
-            Log workout
+            <Dumbbell className="mr-1.5 h-4 w-4" aria-hidden />
+            Start workout
           </Link>
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Weight"
-          value={summary.lastWeight ? formatKg(summary.lastWeight) : "—"}
-          icon={Scale}
-          hint={summary.lastWeight ? "Latest entry" : "Log your first weight"}
-        />
-        <StatCard
-          title="Workouts today"
-          value={summary.workoutsToday > 0 ? String(summary.workoutsToday) : "0"}
-          icon={Dumbbell}
-          hint={summary.workoutsToday > 0 ? "Keep it up!" : "Rest day"}
-        />
-        <StatCard
-          title="Calories burned"
-          value={formatNumber(summary.caloriesBurned)}
-          icon={Flame}
-          hint={`${formatMinutes(summary.activeMinutes)} active`}
-        />
-        <StatCard
-          title="Water"
-          value={formatMl(summary.waterMl)}
-          icon={Droplets}
-          hint={`of ${formatMl(summary.waterTargetMl)} target`}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border bg-card p-4">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-medium">Water goal</span>
-            <span className="text-muted-foreground">
-              {formatMl(summary.waterMl)} / {formatMl(summary.waterTargetMl)}
-            </span>
-          </div>
-          <Progress value={waterPercent} className="h-2.5" />
-        </div>
-        <div className="rounded-xl border bg-card p-4">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="flex items-center gap-1.5">
-              <Footprints className="h-4 w-4 text-muted-foreground" aria-hidden />
-              Step goal
-            </span>
-            <span className="text-muted-foreground">
-              {formatNumber(summary.steps)} / {formatNumber(summary.stepTarget)}
-            </span>
-          </div>
-          <Progress value={stepPercent} className="h-2.5" />
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Weight trend" description="Your logged weight over time">
-          <WeightChart data={weightTrend} />
-        </ChartCard>
-        <ChartCard
-          title="Workouts"
-          description="Workouts over the last 30 days"
-          action={
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/app/workouts">View all</Link>
-            </Button>
-          }
-        >
-          <WorkoutChart data={workoutTrend} />
-        </ChartCard>
-      </div>
+      <QuickAddDialog open={quickOpen} onOpenChange={handleQuickAddChange} />
     </div>
   );
 }

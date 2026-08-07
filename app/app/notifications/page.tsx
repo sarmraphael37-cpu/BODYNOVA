@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Notifications",
+  description: "Your recent activity and alerts.",
 };
 
 export default async function NotificationsPage() {

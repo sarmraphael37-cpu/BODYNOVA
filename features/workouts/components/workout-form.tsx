@@ -117,7 +117,7 @@ export function WorkoutForm({ exercises }: WorkoutFormProps) {
       formData.set(key, String(value));
     }
     formData.set("exercises", JSON.stringify(values.exercises));
-    formAction(formData);
+    React.startTransition(() => formAction(formData));
   });
 
   return (

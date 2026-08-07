@@ -101,7 +101,7 @@ export function PreferencesForm({ preferences }: { preferences: UserPreferences 
     for (const option of notificationOptions) {
       if (!formData.has(option.key)) formData.set(option.key, "false");
     }
-    formAction(formData);
+    React.startTransition(() => formAction(formData));
   });
 
   return (

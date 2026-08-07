@@ -31,6 +31,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Achievements",
+  description: "Milestones you have unlocked along the way.",
 };
 
 const categoryIcons: Record<string, LucideIcon> = {

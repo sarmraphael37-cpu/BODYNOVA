@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Habits",
+  description: "Build and maintain daily habits.",
 };
 
 export default async function HabitsPage() {

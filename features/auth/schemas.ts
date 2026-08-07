@@ -29,6 +29,10 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
+    email: z.email({ error: "Please enter a valid email address." }),
+    code: z
+      .string()
+      .regex(/^\d{6}$/, { error: "Enter the 6-digit code from your email." }),
     password: z
       .string()
       .min(8, { error: "Password must be at least 8 characters." })

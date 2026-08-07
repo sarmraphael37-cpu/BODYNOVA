@@ -61,3 +61,37 @@ supabase db reset
 ```
 
 Drops everything and re-applies migrations + seeds.
+
+## Email (Brevo SMTP)
+
+BodyNova sends emails through **Brevo SMTP**:
+
+- **Welcome email** — sent by the Next.js app from `lib/email.ts` right after a
+  user signs up. Credentials live in `.env.local` under the `Brevo SMTP`
+  section (`BREVO_SMTP_*`). Grab them at
+  https://app.brevo.com/settings/keys/smtp.
+- **Verification & password-reset emails** — sent by Supabase Auth's own
+  servers, so they must be configured in the **Supabase Dashboard**, not in the
+  app. Use the same Brevo credentials:
+
+  1. Dashboard → your project → **Authentication → Providers** (or
+     **Authentication → Emails** depending on dashboard version).
+  2. Under **SMTP Settings**, enable custom SMTP and enter:
+
+     ```text
+     SMTP Host:     smtp-relay.brevo.com
+     SMTP Port:     587
+     SMTP Username: <your Brevo SMTP login>        (BREVO_SMTP_USER)
+     SMTP Password: <your Brevo SMTP master key>   (BREVO_SMTP_KEY)
+     Sender email:  <verified sender address>      (BREVO_SMTP_FROM)
+     Sender name:   BodyNova
+     ```
+
+  3. Set **Confirm email** (Email confirmations) to *On* if you want users to
+     verify their address before signing in.
+  4. Save, then run a test signup from the app — the confirmation email will
+     arrive from your Brevo sender.
+
+> The `BREVO_SMTP_FROM` address must be a sender **verified in Brevo**
+> (Settings → Senders & IPs). Brevo's free plan allows sending to any inbox,
+> including Gmail.

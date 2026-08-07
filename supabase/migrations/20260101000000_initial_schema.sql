@@ -3,43 +3,9 @@
 -- ----------------------------------------------------------------------------
 -- Tables, Row Level Security, triggers, and indexes.
 -- Run with `supabase db push` or apply manually in the Supabase SQL editor.
+-- NOTE: is_admin()/log_audit() are defined AFTER the profiles table because
+-- SQL-language functions are validated against the schema at creation time.
 -- ============================================================================
-
--- ----------------------------------------------------------------------------
--- Helper: is the current user an admin?
--- ----------------------------------------------------------------------------
-create or replace function public.is_admin()
-returns boolean
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'admin'
-  );
-$$;
-
--- ----------------------------------------------------------------------------
--- Helper: write an audit log entry.
--- ----------------------------------------------------------------------------
-create or replace function public.log_audit(
-  p_action text,
-  p_entity_type text,
-  p_entity_id text default null,
-  p_metadata jsonb default null
-)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.audit_logs (actor_id, action, entity_type, entity_id, metadata)
-  values (auth.uid(), p_action, p_entity_type, p_entity_id, p_metadata);
-end;
-$$;
 
 -- ----------------------------------------------------------------------------
 -- profiles
@@ -79,6 +45,42 @@ create policy "Users can update their own profile"
 create policy "Users can insert their own profile"
   on public.profiles for insert
   with check (auth.uid() = id);
+
+-- ----------------------------------------------------------------------------
+-- Helper: is the current user an admin?
+-- ----------------------------------------------------------------------------
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+-- ----------------------------------------------------------------------------
+-- Helper: write an audit log entry.
+-- ----------------------------------------------------------------------------
+create or replace function public.log_audit(
+  p_action text,
+  p_entity_type text,
+  p_entity_id text default null,
+  p_metadata jsonb default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.audit_logs (actor_id, action, entity_type, entity_id, metadata)
+  values (auth.uid(), p_action, p_entity_type, p_entity_id, p_metadata);
+end;
+$$;
 
 create policy "Admins can view all profiles"
   on public.profiles for select

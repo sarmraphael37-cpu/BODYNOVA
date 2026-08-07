@@ -12,21 +12,24 @@ import { ChartCard } from "@/components/ui/chart-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatMl, formatNumber } from "@/utils/format";
+import { formatMl, formatLiters, formatNumber } from "@/utils/format";
 import { formatDate } from "@/utils/dates";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Hydration",
+  description: "Track your daily water intake.",
 };
 
 export default async function HydrationPage() {
-  await requireProfile();
+  const profile = await requireProfile();
   const [logs, totals] = await Promise.all([
     getWaterLogs(),
     getWaterTotalByDate(30),
   ]);
+
+  const waterTargetMl = profile?.preferences?.water_target_ml ?? 2500;
 
   const today = new Date().toISOString().slice(0, 10);
   const waterToday = logs
@@ -58,9 +61,9 @@ export default async function HydrationPage() {
         />
         <StatCard
           title="Daily target"
-          value={formatMl(2500)}
+          value={formatMl(waterTargetMl)}
           icon={Target}
-          hint="2.5 L per day"
+          hint={`${formatLiters(waterTargetMl)} per day`}
         />
         <StatCard
           title="This week"

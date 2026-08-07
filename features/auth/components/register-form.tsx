@@ -2,13 +2,11 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "@/components/ui/field";
-import { registerSchema, type RegisterInput } from "@/features/auth/schemas";
+import { IconInput } from "@/features/auth/components/icon-input";
+import { PasswordInput } from "@/features/auth/components/password-input";
 import { registerAction, type AuthActionState } from "@/features/auth/actions";
 
 export function RegisterForm() {
@@ -17,56 +15,49 @@ export function RegisterForm() {
     {}
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { full_name: "", email: "", password: "" },
-  });
+  const fieldErrors = state.fieldErrors;
 
   return (
-    <form
-      action={formAction}
-      onSubmit={handleSubmit(() => undefined)}
-      className="grid gap-4"
-      noValidate
-    >
-      <FieldWrapper label="Full name" htmlFor="full_name" error={errors.full_name}>
-        <Input
+    <form action={formAction} className="grid gap-4" noValidate>
+      <FieldWrapper
+        label="Full name"
+        htmlFor="full_name"
+        error={fieldErrors?.full_name?.[0]}
+      >
+        <IconInput
           id="full_name"
+          name="full_name"
+          icon={User}
           autoComplete="name"
           placeholder="Alex Johnson"
-          aria-invalid={Boolean(errors.full_name)}
-          {...register("full_name")}
+          aria-invalid={Boolean(fieldErrors?.full_name)}
         />
       </FieldWrapper>
 
-      <FieldWrapper label="Email" htmlFor="email" error={errors.email}>
-        <Input
+      <FieldWrapper label="Email" htmlFor="email" error={fieldErrors?.email?.[0]}>
+        <IconInput
           id="email"
+          name="email"
           type="email"
+          icon={Mail}
           autoComplete="email"
           placeholder="you@example.com"
-          aria-invalid={Boolean(errors.email)}
-          {...register("email")}
+          aria-invalid={Boolean(fieldErrors?.email)}
         />
       </FieldWrapper>
 
       <FieldWrapper
         label="Password"
         htmlFor="password"
-        error={errors.password}
+        error={fieldErrors?.password?.[0]}
         hint="At least 8 characters, including a letter and a number."
       >
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
+          name="password"
           autoComplete="new-password"
           placeholder="••••••••"
-          aria-invalid={Boolean(errors.password)}
-          {...register("password")}
+          aria-invalid={Boolean(fieldErrors?.password)}
         />
       </FieldWrapper>
 

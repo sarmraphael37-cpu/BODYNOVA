@@ -73,7 +73,7 @@ export function GoalForm() {
       if (value === undefined || value === null || value === "") continue;
       formData.set(key, String(value));
     }
-    formAction(formData);
+    React.startTransition(() => formAction(formData));
   });
 
   return (
