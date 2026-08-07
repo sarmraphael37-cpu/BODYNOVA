@@ -18,6 +18,9 @@ import type {
   UserAchievement,
   Notification,
   AiInsight,
+  AiConversation,
+  AiMessage,
+  AiUsage,
   ProgressReport,
   AuditLog,
   PasswordReset,
@@ -55,6 +58,9 @@ export type Database = {
       user_achievements: Row<UserAchievement>;
       notifications: Row<Notification>;
       ai_insights: Row<AiInsight>;
+      ai_conversations: Row<AiConversation>;
+      ai_messages: Row<AiMessage>;
+      ai_usage: Row<AiUsage>;
       progress_reports: Row<ProgressReport>;
       audit_logs: Row<AuditLog>;
       password_resets: Row<PasswordReset>;

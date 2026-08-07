@@ -1,29 +1,43 @@
 import type { Metadata } from "next";
 import { requireProfile } from "@/lib/dal/auth";
-import { getInsights } from "@/features/ai-coach/queries";
-import { CoachFeed } from "@/features/ai-coach/components/coach-feed";
+import { getAiCoachPageData } from "@/features/ai-coach/queries";
+import { OverviewCards } from "@/features/ai-coach/components/overview-cards";
+import { AiCoachClient } from "@/features/ai-coach/components/ai-coach-client";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "AI Coach",
-  description: "Personalized coaching insights based on your latest data.",
+  description:
+    "Personalized coaching, weekly intelligence, and a private AI chat powered by your fitness journey.",
 };
 
 export default async function AiCoachPage() {
   await requireProfile();
-  const insights = await getInsights();
+  const data = await getAiCoachPageData();
 
   return (
     <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">AI Coach</h1>
-        <p className="text-sm text-muted-foreground">
-          Personalized coaching insights built from your tracked data.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Your AI Fitness Coach</h1>
+          <p className="text-sm text-muted-foreground">
+            Personalized guidance powered by your recorded fitness journey.
+          </p>
+        </div>
       </div>
 
-      <CoachFeed insights={insights} />
+      <OverviewCards
+        overview={data.overview}
+        weekly={data.weekly}
+        currentGoal={data.currentGoal}
+      />
+
+      <AiCoachClient
+        initialConversations={data.conversations}
+        initialMessages={data.activeMessages}
+        initialConversationId={data.activeConversationId}
+      />
     </div>
   );
 }

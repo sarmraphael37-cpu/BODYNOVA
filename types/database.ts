@@ -311,8 +311,54 @@ export type AiInsight = {
   user_id: string;
   type: InsightType;
   title: string;
+  summary: string | null;
   content: string;
   metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type AiConversation = {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AiMessageRole = "user" | "assistant" | "system";
+
+export type AiMessage = {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  role: AiMessageRole;
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type AiUsageStatus = "success" | "error" | "fallback";
+
+export type AiUsageFeature =
+  | "chat"
+  | "insight"
+  | "weekly_review"
+  | "workout"
+  | "progress"
+  | "chart_explain";
+
+export type AiUsage = {
+  id: string;
+  user_id: string;
+  feature: AiUsageFeature;
+  provider: string | null;
+  model: string | null;
+  status: AiUsageStatus;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  latency_ms: number | null;
+  error: string | null;
   created_at: string;
 }
 

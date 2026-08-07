@@ -54,3 +54,36 @@ export function getBrevoConfig(): BrevoConfig {
     fromName: process.env.BREVO_SMTP_FROM_NAME ?? "BodyNova",
   };
 }
+
+export type AiProviderName = "openai" | "openai-compatible";
+
+export type AiConfig = {
+  provider: AiProviderName;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+};
+
+export function isAiConfigured(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
+}
+
+export function getAiConfig(): AiConfig {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "AI Coach is not configured. Add OPENAI_API_KEY or AI_API_KEY to your environment."
+    );
+  }
+
+  const provider = (process.env.AI_COACH_PROVIDER ?? "openai") as AiProviderName;
+  const baseUrl =
+    process.env.AI_API_BASE_URL ?? "https://api.openai.com/v1";
+
+  return {
+    provider,
+    apiKey,
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    model: process.env.AI_MODEL ?? "gpt-4o-mini",
+  };
+}
