@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
+  ArrowRight,
   Brain,
   Check,
   Copy,
@@ -18,7 +20,6 @@ import { cn } from "@/utils/cn";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Markdown } from "@/features/ai-coach/components/markdown";
 import { relativeTime } from "@/utils/dates";
 import type { AiMessage } from "@/types/database";
@@ -38,6 +39,19 @@ const SUGGESTED_PROMPTS = [
   "Why hasn't my weight changed?",
   "How is my sleep affecting my routine?",
 ];
+
+type QuickAction = { id: string; label: string; href: string };
+
+function readActions(metadata: AiMessage["metadata"]): QuickAction[] {
+  if (!metadata || !Array.isArray(metadata.actions)) return [];
+  return metadata.actions.filter(
+    (a): a is QuickAction =>
+      typeof a === "object" &&
+      a !== null &&
+      typeof (a as QuickAction).label === "string" &&
+      typeof (a as QuickAction).href === "string"
+  );
+}
 
 type StreamEvent =
   | { type: "meta"; conversationId: string }
@@ -139,6 +153,7 @@ export function AiCoachClient({
   const [streamingText, setStreamingText] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = React.useState(false);
   const activeIdRef = React.useRef(activeId);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
@@ -173,6 +188,7 @@ export function AiCoachClient({
     async (id: string) => {
       if (streaming) return;
       setActiveId(id);
+      setShowSidebar(false);
       const msgs = await getMessagesAction(id);
       setMessages(msgs);
     },
@@ -257,6 +273,14 @@ export function AiCoachClient({
     toast.success("Conversation cleared.");
   }, []);
 
+  const handleNewConversation = React.useCallback(() => {
+    activeIdRef.current = undefined;
+    setActiveId(undefined);
+    setMessages([]);
+    setShowSidebar(false);
+    inputRef.current?.focus();
+  }, []);
+
   const filtered = React.useMemo(
     () =>
       conversations.filter((c) =>
@@ -268,94 +292,103 @@ export function AiCoachClient({
   const showEmptyState = messages.length === 0 && !streaming;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
       {/* Conversation sidebar */}
       <aside className="grid gap-3 lg:sticky lg:top-6 lg:self-start">
-        <Button
-          className="w-full"
-          onClick={() => {
-            activeIdRef.current = undefined;
-            setActiveId(undefined);
-            setMessages([]);
-            inputRef.current?.focus();
-          }}
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          New conversation
-        </Button>
+        <div className="flex gap-2 lg:hidden">
+          <Button className="flex-1" onClick={handleNewConversation}>
+            <Plus className="h-4 w-4" aria-hidden />
+            New conversation
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowSidebar((v) => !v)}
+            aria-expanded={showSidebar}
+          >
+            <MessageSquare className="h-4 w-4" aria-hidden />
+            {conversations.length > 0 ? `(${conversations.length})` : ""}
+          </Button>
+        </div>
 
-        <div className="rounded-xl border bg-card shadow-sm">
-          <div className="relative p-2">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search conversations…"
-              className="h-9 w-full rounded-lg border border-transparent bg-transparent pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-input"
-              aria-label="Search conversations"
-            />
-          </div>
-          <div className="max-h-[420px] overflow-y-auto p-2 lg:max-h-[460px]">
-            {filtered.length === 0 ? (
-              <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                {search ? "No conversations match your search." : "No conversations yet."}
-              </p>
-            ) : (
-              <ul className="space-y-1">
-                {filtered.map((conversation) => {
-                  const active = conversation.id === activeId;
-                  return (
-                    <li key={conversation.id}>
-                      <div
-                        className={cn(
-                          "group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors",
-                          active ? "bg-primary/10" : "hover:bg-accent"
-                        )}
-                        onClick={() => selectConversation(conversation.id)}
-                      >
-                        <MessageSquare
-                          className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground")}
-                          aria-hidden
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className={cn("truncate text-sm font-medium", active && "text-primary")}>
-                            {conversation.title}
-                          </p>
-                          {conversation.preview && (
-                            <p className="truncate text-xs text-muted-foreground">
-                              {conversation.preview}
-                            </p>
+        <div className={cn("grid gap-3", showSidebar ? "grid" : "hidden lg:grid")}>
+          <Button className="hidden w-full lg:inline-flex" onClick={handleNewConversation}>
+            <Plus className="h-4 w-4" aria-hidden />
+            New conversation
+          </Button>
+
+          <div className="rounded-xl border bg-card shadow-sm">
+            <div className="relative p-2">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search conversations…"
+                className="h-9 w-full rounded-lg border border-transparent bg-transparent pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-input"
+                aria-label="Search conversations"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto p-2 lg:max-h-[440px]">
+              {filtered.length === 0 ? (
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  {search ? "No conversations match your search." : "No conversations yet."}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {filtered.map((conversation) => {
+                    const active = conversation.id === activeId;
+                    return (
+                      <li key={conversation.id}>
+                        <div
+                          className={cn(
+                            "group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors",
+                            active ? "bg-primary/10" : "hover:bg-accent"
                           )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteConversation(conversation.id);
-                          }}
-                          className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus:opacity-100 group-hover:opacity-100"
-                          aria-label={`Delete ${conversation.title}`}
+                          onClick={() => selectConversation(conversation.id)}
                         >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                          <MessageSquare
+                            className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground")}
+                            aria-hidden
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className={cn("truncate text-sm font-medium", active && "text-primary")}>
+                              {conversation.title}
+                            </p>
+                            {conversation.preview && (
+                              <p className="truncate text-xs text-muted-foreground">
+                                {conversation.preview}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteConversation(conversation.id);
+                            }}
+                            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+                            aria-label={`Delete ${conversation.title}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       </aside>
 
       {/* Chat panel */}
-      <Card className="flex min-h-[560px] flex-col">
-        <div className="flex items-center justify-between gap-3 border-b p-4">
+      <Card className="flex min-h-[480px] flex-col sm:min-h-[560px]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-brand">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-brand">
               <Brain className="h-4.5 w-4.5 text-primary-foreground" aria-hidden />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-sm font-semibold">Ask your coach</h2>
               <p className="text-xs text-muted-foreground">
                 AI-generated guidance based on your recorded fitness data.
@@ -369,87 +402,117 @@ export function AiCoachClient({
           )}
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4 lg:max-h-[520px]">
+        <div className="max-h-[55vh] flex-1 space-y-4 overflow-y-auto p-4 lg:max-h-[520px]">
           {showEmptyState ? (
-            <div className="flex h-full flex-col items-center justify-center gap-4 py-6">
-              <EmptyState
-                icon={Sparkles}
-                title="Start a conversation"
-                description="Ask about your progress, get a workout, understand your trends, or log entries with plain language."
-                className="border-transparent"
-              />
-              <div className="grid w-full max-w-lg gap-2 sm:grid-cols-2">
-                {SUGGESTED_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => send(prompt)}
-                    className="rounded-lg border bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                  >
-                    {prompt}
-                  </button>
-                ))}
+            <div className="flex h-full flex-col items-center justify-center gap-6 py-6">
+              <div className="text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-brand">
+                  <Brain className="h-6 w-6 text-primary-foreground" aria-hidden />
+                </div>
+                <h3 className="text-base font-semibold">Start a conversation</h3>
+                <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  Ask about your progress, get a workout, understand your trends, or log entries
+                  with plain language.
+                </p>
+              </div>
+
+              <div className="w-full max-w-lg">
+                <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
+                  Suggested questions
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => send(prompt)}
+                      className="group flex items-start gap-2 rounded-xl border bg-card px-3.5 py-3 text-left text-sm text-foreground transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden />
+                      <span className="leading-snug">{prompt}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
             <>
               {messages.map((message, index) => {
                 const isUser = message.role === "user";
+                const actions = isUser ? [] : readActions(message.metadata);
                 return (
                   <div
                     key={message.id}
-                    className={cn("flex gap-3", isUser && "justify-end")}
+                    className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
                   >
-                    {!isUser && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-brand">
-                        <Brain className="h-4 w-4 text-primary-foreground" aria-hidden />
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        "group relative max-w-[85%] space-y-1 rounded-2xl px-4 py-3 sm:max-w-[75%]",
-                        isUser
-                          ? "rounded-br-sm bg-primary text-primary-foreground"
-                          : "rounded-bl-sm border bg-card"
-                      )}
-                    >
-                      {isUser ? (
-                        <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-                      ) : (
-                        <Markdown content={message.content} />
+                    <div className={cn("flex w-full gap-3", isUser && "justify-end")}>
+                      {!isUser && (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-brand">
+                          <Brain className="h-4 w-4 text-primary-foreground" aria-hidden />
+                        </div>
                       )}
                       <div
                         className={cn(
-                          "flex items-center gap-2 text-[10px]",
-                          isUser ? "justify-end text-primary-foreground/70" : "text-muted-foreground"
+                          "group relative max-w-[85%] space-y-1 rounded-2xl px-4 py-3 sm:max-w-[75%]",
+                          isUser
+                            ? "rounded-br-sm bg-primary text-primary-foreground"
+                            : "rounded-bl-sm border bg-card"
                         )}
                       >
-                        <span>{relativeTime(message.created_at)}</span>
-                        <button
-                          type="button"
-                          onClick={() => copyMessage(message.id, message.content)}
-                          className="opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-                          aria-label="Copy message"
-                        >
-                          {copiedId === message.id ? (
-                            <Check className="h-3 w-3" aria-hidden />
-                          ) : (
-                            <Copy className="h-3 w-3" aria-hidden />
+                        {isUser ? (
+                          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                        ) : (
+                          <Markdown content={message.content} />
+                        )}
+                        <div
+                          className={cn(
+                            "flex items-center gap-2 text-[10px]",
+                            isUser ? "justify-end text-primary-foreground/70" : "text-muted-foreground"
                           )}
-                        </button>
-                        {!isUser && (
+                        >
+                          <span>{relativeTime(message.created_at)}</span>
                           <button
                             type="button"
-                            onClick={() => regenerate(index)}
-                            disabled={streaming}
-                            className="opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 disabled:opacity-40 group-hover:opacity-100"
-                            aria-label="Regenerate response"
+                            onClick={() => copyMessage(message.id, message.content)}
+                            className="opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
+                            aria-label="Copy message"
                           >
-                            <RefreshCw className="h-3 w-3" aria-hidden />
+                            {copiedId === message.id ? (
+                              <Check className="h-3 w-3" aria-hidden />
+                            ) : (
+                              <Copy className="h-3 w-3" aria-hidden />
+                            )}
                           </button>
-                        )}
+                          {!isUser && (
+                            <button
+                              type="button"
+                              onClick={() => regenerate(index)}
+                              disabled={streaming}
+                              className="opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 disabled:opacity-40 group-hover:opacity-100"
+                              aria-label="Regenerate response"
+                            >
+                              <RefreshCw className="h-3 w-3" aria-hidden />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {actions.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 pl-11">
+                        {actions.map((action) => (
+                          <Link
+                            key={action.id}
+                            href={action.href}
+                            className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 hover:underline-offset-2"
+                          >
+                            {action.label}
+                            <ArrowRight className="h-3 w-3" aria-hidden />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -500,6 +563,7 @@ export function AiCoachClient({
             <Button
               type="submit"
               size="icon"
+              className="h-[60px] w-[52px] shrink-0"
               disabled={streaming || !input.trim()}
               aria-label="Send message"
             >

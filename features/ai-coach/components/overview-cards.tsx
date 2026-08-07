@@ -26,8 +26,8 @@ export function OverviewCards({
   currentGoal: GoalProgressValue | null;
 }) {
   return (
-    <section aria-label="Coach overview" className="grid gap-4 md:grid-cols-2">
-      <Card className="md:col-span-2">
+    <section aria-label="Coach overview" className="grid gap-4 sm:grid-cols-2">
+      <Card className="sm:col-span-2">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-brand">
@@ -101,14 +101,14 @@ export function OverviewCards({
         </CardContent>
       </Card>
 
-      <Card className="md:col-span-2">
+      <Card className="sm:col-span-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <CalendarDays className="h-4 w-4 text-primary" aria-hidden />
             Weekly Intelligence
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-2">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <p className="text-sm leading-relaxed text-muted-foreground">{weekly.yourWeek}</p>
           <div className="space-y-3">
             <div>

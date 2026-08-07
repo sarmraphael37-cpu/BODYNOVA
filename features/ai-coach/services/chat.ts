@@ -139,9 +139,9 @@ export async function startChat(input: {
       latencyMs: Date.now() - startedAt,
     });
 
-    const text = formatDeterministicReply(reply.reply, reply.actions);
-    const stream = streamReplyAndPersist(userId, conversationId, text, startedAt, {
+    const stream = streamReplyAndPersist(userId, conversationId, reply.reply, startedAt, {
       kind: "deterministic",
+      actions: reply.actions,
     });
     return { conversationId, stream };
   }
@@ -162,12 +162,6 @@ export async function startChat(input: {
   });
 
   return { conversationId, stream };
-}
-
-function formatDeterministicReply(reply: string, actions: { id: string; label: string; href: string }[]): string {
-  if (actions.length === 0) return reply;
-  const actionLines = actions.map((a) => `→ ${a.label}: ${a.href}`).join("\n");
-  return `${reply}\n\n**Quick actions**\n${actionLines}`;
 }
 
 async function* streamReplyAndPersist(
@@ -226,8 +220,7 @@ async function* streamProviderAndPersist(params: {
     // back to deterministic analytics so the user still gets an answer.
     if (fullText.length === 0) {
       const fallback = answerDeterministically(context, providerMessages.at(-1)?.content ?? "");
-      const text = formatDeterministicReply(fallback.reply, fallback.actions);
-      const words = text.split(/(?<= )/);
+      const words = fallback.reply.split(/(?<= )/);
       for (let i = 0; i < words.length; i += 3) {
         fullText += words.slice(i, i + 3).join("");
         yield { delta: words.slice(i, i + 3).join("") };
@@ -247,7 +240,7 @@ async function* streamProviderAndPersist(params: {
         conversationId,
         role: "assistant",
         content: fullText,
-        metadata: { kind: "deterministic", source: "fallback" },
+        metadata: { kind: "deterministic", source: "fallback", actions: fallback.actions },
       });
       return;
     }
@@ -255,7 +248,7 @@ async function* streamProviderAndPersist(params: {
 
   if (fullText.length === 0) {
     const fallback = answerDeterministically(context, providerMessages.at(-1)?.content ?? "");
-    fullText = formatDeterministicReply(fallback.reply, fallback.actions);
+    fullText = fallback.reply;
     for (const word of fullText.split(/(?<= )/)) {
       yield { delta: word };
       await new Promise((resolve) => setTimeout(resolve, 8));
@@ -269,19 +262,27 @@ async function* streamProviderAndPersist(params: {
       error: "Empty provider response; served deterministic analytics.",
       latencyMs: Date.now() - started,
     });
-  } else {
-    await logAiUsage({
+    await addMessage({
       userId,
-      feature: "chat",
-      provider: provider.name,
-      model: provider.model,
-      status: "success",
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-      totalTokens: usage.totalTokens,
-      latencyMs: Date.now() - started,
+      conversationId,
+      role: "assistant",
+      content: fullText,
+      metadata: { kind: "deterministic", source: "fallback", actions: fallback.actions },
     });
+    return;
   }
+
+  await logAiUsage({
+    userId,
+    feature: "chat",
+    provider: provider.name,
+    model: provider.model,
+    status: "success",
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    latencyMs: Date.now() - started,
+  });
 
   await addMessage({
     userId,
