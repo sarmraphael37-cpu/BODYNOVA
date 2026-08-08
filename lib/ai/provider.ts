@@ -3,9 +3,13 @@ import { getAiConfig } from "@/lib/env";
 
 export type AiRole = "system" | "user" | "assistant";
 
+export type AiContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export type AiChatMessage = {
   role: AiRole;
-  content: string;
+  content: string | AiContentPart[];
 };
 
 export type AiUsageInfo = {

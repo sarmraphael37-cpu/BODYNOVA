@@ -17,7 +17,10 @@ import {
 import { executeTool } from "@/features/ai-coach/services/tools";
 import { detectToolIntent } from "@/features/ai-coach/lib/tools";
 import { answerDeterministically } from "@/features/ai-coach/lib/responder";
+import { attachmentToContentParts } from "@/features/ai-coach/services/files";
+import type { AiContentPart } from "@/lib/ai/provider";
 import type { AiMessageRole } from "@/types/database";
+import type { ChatAttachment } from "@/features/ai-coach/schemas";
 
 const HISTORY_LIMIT = 10;
 const TITLE_LIMIT = 48;
@@ -54,9 +57,10 @@ export async function startChat(input: {
   userId: string;
   message: string;
   conversationId?: string;
+  attachments?: ChatAttachment[];
   signal?: AbortSignal;
 }): Promise<ChatSession> {
-  const { userId, message, signal } = input;
+  const { userId, message, attachments = [], signal } = input;
 
   try {
     await checkAiRateLimit(userId);
@@ -148,10 +152,15 @@ export async function startChat(input: {
 
   // 3. Provider streaming.
   const history = await getMessages(userId, conversationId);
-  const promptMessages = history
+  const historyMessages = history
     .slice(-HISTORY_LIMIT)
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role as AiMessageRole, content: m.content }));
+
+  const promptMessages: { role: AiMessageRole; content: string | AiContentPart[] }[] = [
+    ...historyMessages.slice(0, -1),
+    ...(await buildUserMessage(message, attachments)),
+  ];
 
   const stream = streamProviderAndPersist({
     userId,
@@ -162,6 +171,26 @@ export async function startChat(input: {
   });
 
   return { conversationId, stream };
+}
+
+/**
+ * Builds the current user turn. When attachments are present the message
+ * becomes multimodal: a text part plus image/text parts for each file.
+ * Otherwise it stays a plain string (backward compatible).
+ */
+async function buildUserMessage(
+  message: string,
+  attachments: ChatAttachment[]
+): Promise<{ role: AiMessageRole; content: string | AiContentPart[] }[]> {
+  if (attachments.length === 0) {
+    return [{ role: "user", content: message }];
+  }
+
+  const parts: AiContentPart[] = [{ type: "text", text: message || "See attached files." }];
+  for (const attachment of attachments) {
+    parts.push(...(await attachmentToContentParts(attachment)));
+  }
+  return [{ role: "user", content: parts }];
 }
 
 async function* streamReplyAndPersist(
@@ -187,11 +216,27 @@ async function* streamReplyAndPersist(
   });
 }
 
+/**
+ * Extracts plain text from a provider message, joining text parts and ignoring
+ * image parts. Used for the deterministic fallback, which is text-only.
+ */
+function lastUserText(
+  messages: { role: AiMessageRole; content: string | AiContentPart[] }[]
+): string {
+  const last = messages.at(-1);
+  if (!last) return "";
+  if (typeof last.content === "string") return last.content;
+  return last.content
+    .filter((part) => part.type === "text")
+    .map((part) => (part.type === "text" ? part.text : ""))
+    .join("\n");
+}
+
 async function* streamProviderAndPersist(params: {
   userId: string;
   conversationId: string;
   context: Awaited<ReturnType<typeof buildFitnessContext>>;
-  providerMessages: { role: AiMessageRole; content: string }[];
+  providerMessages: { role: AiMessageRole; content: string | AiContentPart[] }[];
   signal?: AbortSignal;
 }): ChatStream {
   const { userId, conversationId, context, providerMessages, signal } = params;
@@ -219,7 +264,7 @@ async function* streamProviderAndPersist(params: {
     // Provider failure mid-stream: if we haven't produced any text yet, fall
     // back to deterministic analytics so the user still gets an answer.
     if (fullText.length === 0) {
-      const fallback = answerDeterministically(context, providerMessages.at(-1)?.content ?? "");
+      const fallback = answerDeterministically(context, lastUserText(providerMessages));
       const words = fallback.reply.split(/(?<= )/);
       for (let i = 0; i < words.length; i += 3) {
         fullText += words.slice(i, i + 3).join("");
@@ -247,7 +292,7 @@ async function* streamProviderAndPersist(params: {
   }
 
   if (fullText.length === 0) {
-    const fallback = answerDeterministically(context, providerMessages.at(-1)?.content ?? "");
+    const fallback = answerDeterministically(context, lastUserText(providerMessages));
     fullText = fallback.reply;
     for (const word of fullText.split(/(?<= )/)) {
       yield { delta: word };

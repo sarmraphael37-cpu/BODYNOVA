@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   const parsed = chatInputSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
-      { error: "Message must be between 1 and 2000 characters." },
+      { error: "Invalid message or attachment." },
       { status: 400 }
     );
   }
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       message: parsed.data.message,
       conversationId: parsed.data.conversationId,
+      attachments: parsed.data.attachments,
       signal: request.signal,
     }));
   } catch (error) {

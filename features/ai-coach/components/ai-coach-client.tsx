@@ -7,13 +7,17 @@ import {
   Brain,
   Check,
   Copy,
+  FileText,
+  Loader2,
   MessageSquare,
+  Paperclip,
   Plus,
   RefreshCw,
   Search,
   Send,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/utils/cn";
@@ -24,12 +28,19 @@ import { Markdown } from "@/features/ai-coach/components/markdown";
 import { relativeTime } from "@/utils/dates";
 import type { AiMessage } from "@/types/database";
 import type { ConversationListItem } from "@/features/ai-coach/services/conversations";
+import type { ChatAttachment } from "@/features/ai-coach/schemas";
 import {
   getConversationsAction,
   getMessagesAction,
   deleteConversationAction,
   clearConversationAction,
 } from "@/features/ai-coach/actions";
+
+const MAX_ATTACHMENTS = 4;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_TEXT_BYTES = 1024 * 1024;
+const ACCEPTED_TYPES =
+  "image/jpeg,image/png,image/webp,image/gif,text/plain,text/markdown,text/csv,application/json,text/xml";
 
 const SUGGESTED_PROMPTS = [
   "How am I doing this week?",
@@ -62,6 +73,7 @@ type StreamEvent =
 async function streamChat(
   message: string,
   conversationId: string | undefined,
+  attachments: ChatAttachment[],
   handlers: {
     onMeta: (id: string) => void;
     onDelta: (delta: string) => void;
@@ -72,7 +84,7 @@ async function streamChat(
   const response = await fetch("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, conversationId }),
+    body: JSON.stringify({ message, conversationId, attachments }),
   });
 
   if (!response.ok || !response.body) {
@@ -149,6 +161,8 @@ export function AiCoachClient({
   const [activeId, setActiveId] = React.useState<string | undefined>(initialConversationId);
   const [messages, setMessages] = React.useState<AiMessage[]>(initialMessages);
   const [input, setInput] = React.useState("");
+  const [attachments, setAttachments] = React.useState<ChatAttachment[]>([]);
+  const [uploading, setUploading] = React.useState(false);
   const [streaming, setStreaming] = React.useState(false);
   const [streamingText, setStreamingText] = React.useState("");
   const [search, setSearch] = React.useState("");
@@ -157,6 +171,7 @@ export function AiCoachClient({
   const activeIdRef = React.useRef(activeId);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     activeIdRef.current = activeId;
@@ -195,12 +210,65 @@ export function AiCoachClient({
     [streaming]
   );
 
+  const handleFiles = React.useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      if (uploading || streaming) return;
+
+      const next = [...attachments];
+      for (const file of Array.from(files)) {
+        const isImage = file.type.startsWith("image/");
+        const maxBytes = isImage ? MAX_IMAGE_BYTES : MAX_TEXT_BYTES;
+        if (file.size > maxBytes) {
+          toast.error(`${file.name} is too large (${isImage ? "4 MB" : "1 MB"} max).`);
+          continue;
+        }
+        if (next.length >= MAX_ATTACHMENTS) {
+          toast.error(`You can attach up to ${MAX_ATTACHMENTS} files per message.`);
+          break;
+        }
+
+        setUploading(true);
+        try {
+          const form = new FormData();
+          form.append("file", file);
+          const response = await fetch("/api/ai/upload", {
+            method: "POST",
+            body: form,
+          });
+          const body = (await response.json().catch(() => null)) as {
+            attachment?: ChatAttachment;
+            error?: string;
+          } | null;
+          if (!response.ok || !body?.attachment) {
+            toast.error(body?.error ?? "Upload failed.");
+            continue;
+          }
+          next.push(body.attachment);
+        } catch {
+          toast.error("Upload failed. Please try again.");
+        } finally {
+          setUploading(false);
+        }
+      }
+      setAttachments(next);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [attachments, uploading, streaming]
+  );
+
+  const removeAttachment = React.useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   const send = React.useCallback(
     async (raw?: string) => {
       const text = (raw ?? input).trim();
-      if (!text || streaming) return;
+      if ((!text && attachments.length === 0) || streaming || uploading) return;
 
       setInput("");
+      const sentAttachments = attachments;
+      setAttachments([]);
       setMessages((prev) => [...prev, makeLocalMessage("user", text)]);
       setStreaming(true);
       setStreamingText("");
@@ -211,7 +279,7 @@ export function AiCoachClient({
         toast.error(error);
       };
 
-      await streamChat(text, conversationId, {
+      await streamChat(text, conversationId, sentAttachments, {
         onMeta: (id) => {
           activeIdRef.current = id;
         },
@@ -224,7 +292,7 @@ export function AiCoachClient({
         },
       });
     },
-    [input, streaming, refreshConversations]
+    [input, attachments, streaming, uploading, refreshConversations]
   );
 
   const regenerate = React.useCallback(
@@ -411,8 +479,9 @@ export function AiCoachClient({
                 </div>
                 <h3 className="text-base font-semibold">Start a conversation</h3>
                 <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                  Ask about your progress, get a workout, understand your trends, or log entries
-                  with plain language.
+                  Ask about your progress, get a workout, understand your trends, log entries
+                  with plain language, or attach a photo, meal screenshot, or document for
+                  analysis.
                 </p>
               </div>
 
@@ -538,37 +607,99 @@ export function AiCoachClient({
 
         <div className="border-t p-3">
           <form
-            className="flex items-end gap-2"
+            className="flex flex-col gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               send();
             }}
           >
-            <Textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder="Ask anything — e.g. “Log 500 ml of water” or “Give me a workout”"
-              className="min-h-[60px] max-h-32 flex-1 resize-none"
-              rows={2}
-              disabled={streaming}
-              aria-label="Message your AI coach"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              className="h-[60px] w-[52px] shrink-0"
-              disabled={streaming || !input.trim()}
-              aria-label="Send message"
-            >
-              <Send className="h-4 w-4" aria-hidden />
-            </Button>
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="group/att flex items-center gap-2 rounded-lg border bg-muted/40 py-1.5 pl-1.5 pr-1"
+                  >
+                    {attachment.kind === "image" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/ai/files?path=${encodeURIComponent(attachment.path)}`}
+                        alt={attachment.name}
+                        className="h-8 w-8 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                        <FileText className="h-4 w-4 text-primary" aria-hidden />
+                      </div>
+                    )}
+                    <span className="max-w-[160px] truncate text-xs text-muted-foreground">
+                      {attachment.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(attachment.id)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`Remove ${attachment.name}`}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_TYPES}
+                multiple
+                onChange={(e) => handleFiles(e.target.files)}
+                className="hidden"
+                aria-hidden
+                tabIndex={-1}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-[60px] w-[52px] shrink-0 text-muted-foreground"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
+                aria-label="Attach a file"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Paperclip className="h-4 w-4" aria-hidden />
+                )}
+              </Button>
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder="Ask anything — attach a photo or doc, or type a message"
+                className="min-h-[60px] max-h-32 flex-1 resize-none"
+                rows={2}
+                disabled={streaming || uploading}
+                aria-label="Message your AI coach"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                className="h-[60px] w-[52px] shrink-0"
+                disabled={streaming || uploading || (!input.trim() && attachments.length === 0)}
+                aria-label="Send message"
+              >
+                <Send className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
           </form>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
             Nova uses your recorded data only. Guidance is informational — not medical advice.

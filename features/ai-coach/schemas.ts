@@ -87,10 +87,25 @@ export const chatResponseSchema = z.object({
 });
 export type ChatResponseContent = z.infer<typeof chatResponseSchema>;
 
-export const chatInputSchema = z.object({
-  message: z.string().trim().min(1).max(2000),
-  conversationId: z.string().uuid().optional(),
+export const chatAttachmentSchema = z.object({
+  id: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(255),
+  mime: z.string().trim().min(1).max(120),
+  kind: z.enum(["image", "text"]),
+  size: z.number().int().min(1).max(4 * 1024 * 1024),
+  path: z.string().trim().min(1).max(400),
 });
+export type ChatAttachment = z.infer<typeof chatAttachmentSchema>;
+
+export const chatInputSchema = z
+  .object({
+    message: z.string().trim().max(2000),
+    conversationId: z.string().uuid().optional(),
+    attachments: z.array(chatAttachmentSchema).max(4).default([]),
+  })
+  .refine((value) => value.message.length > 0 || value.attachments.length > 0, {
+    message: "Send a message or attach a file.",
+  });
 export type ChatInput = z.infer<typeof chatInputSchema>;
 
 // ---------------------------------------------------------------------------
