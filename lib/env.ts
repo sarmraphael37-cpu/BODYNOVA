@@ -55,7 +55,11 @@ export function getBrevoConfig(): BrevoConfig {
   };
 }
 
-export type AiProviderName = "openai" | "openai-compatible";
+export type AiProviderName =
+  | "openai"
+  | "gemini"
+  | "groq"
+  | "openai-compatible";
 
 export type AiConfig = {
   provider: AiProviderName;
@@ -64,26 +68,70 @@ export type AiConfig = {
   model: string;
 };
 
+type AiKeySource = {
+  envName: string;
+  provider: AiProviderName;
+  defaultBaseUrl: string;
+  defaultModel: string;
+};
+
+/**
+ * Provider sources in priority order. The first variable that has a value wins,
+ * so the app works out of the box with whichever key you add.
+ */
+const AI_KEY_SOURCES: AiKeySource[] = [
+  {
+    envName: "OPENAI_API_KEY",
+    provider: "openai",
+    defaultBaseUrl: "https://api.openai.com/v1",
+    defaultModel: "gpt-4o-mini",
+  },
+  {
+    envName: "GEMINI_API_KEY",
+    provider: "gemini",
+    defaultBaseUrl:
+      "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+  },
+  {
+    envName: "GROQ_API_KEY",
+    provider: "groq",
+    defaultBaseUrl: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile",
+  },
+  {
+    envName: "AI_API_KEY",
+    provider: "openai-compatible",
+    defaultBaseUrl: "https://api.openai.com/v1",
+    defaultModel: "gpt-4o-mini",
+  },
+];
+
 export function isAiConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
+  return AI_KEY_SOURCES.some((source) =>
+    Boolean(process.env[source.envName])
+  );
 }
 
 export function getAiConfig(): AiConfig {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
-  if (!apiKey) {
+  const source = AI_KEY_SOURCES.find((s) =>
+    Boolean(process.env[s.envName])
+  );
+  if (!source) {
     throw new Error(
-      "AI Coach is not configured. Add OPENAI_API_KEY or AI_API_KEY to your environment."
+      "AI Coach is not configured. Add OPENAI_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, or AI_API_KEY to your environment."
     );
   }
 
-  const provider = (process.env.AI_COACH_PROVIDER ?? "openai") as AiProviderName;
+  const provider = (process.env.AI_COACH_PROVIDER ??
+    source.provider) as AiProviderName;
   const baseUrl =
-    process.env.AI_API_BASE_URL ?? "https://api.openai.com/v1";
+    process.env.AI_API_BASE_URL ?? source.defaultBaseUrl;
 
   return {
     provider,
-    apiKey,
+    apiKey: process.env[source.envName] as string,
     baseUrl: baseUrl.replace(/\/+$/, ""),
-    model: process.env.AI_MODEL ?? "gpt-4o-mini",
+    model: process.env.AI_MODEL ?? source.defaultModel,
   };
 }

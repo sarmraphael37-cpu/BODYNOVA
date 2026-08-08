@@ -281,6 +281,23 @@ export function answerDeterministically(
     };
   }
 
+  if (/^(hi|hello|hey|yo|good (morning|afternoon|evening)|sup)\b/.test(q)) {
+    return {
+      reply:
+        `Hey ${ctx.user.firstName || "there"}! I'm Nova, your coach. I can tell you about your progress, recommend a workout, or answer fitness questions — try asking about your steps, sleep, hydration, or this week's training.`,
+      actions: [{ id: "coach", label: "Today's focus", href: "/app/ai-coach" }],
+      confidence: "high",
+    };
+  }
+
+  if (/(thank|thanks|thx|appreciate)/.test(q)) {
+    return {
+      reply: "You're welcome! I'm here whenever you need — ask about your progress, this week's training, hydration, or anything fitness related.",
+      actions: [{ id: "coach", label: "Ask me anything", href: "/app/ai-coach" }],
+      confidence: "high",
+    };
+  }
+
   const week = buildWeeklySummary(ctx);
 
   if (/(why|isn.t|isnt|hasn.t|not changing|plateau|stuck).*(weight)|(weight).*(not changing|plateau|stuck)/.test(q)) {
