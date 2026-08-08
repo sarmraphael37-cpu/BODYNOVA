@@ -10,12 +10,14 @@ import {
   FileText,
   Loader2,
   MessageSquare,
+  Mic,
   Paperclip,
   Plus,
   RefreshCw,
   Search,
   Send,
   Sparkles,
+  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -39,6 +41,7 @@ import {
 const MAX_ATTACHMENTS = 4;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_TEXT_BYTES = 1024 * 1024;
+const MAX_RECORD_SECONDS = 60;
 const ACCEPTED_TYPES =
   "image/jpeg,image/png,image/webp,image/gif,text/plain,text/markdown,text/csv,application/json,text/xml";
 
@@ -165,6 +168,9 @@ export function AiCoachClient({
   const [uploading, setUploading] = React.useState(false);
   const [streaming, setStreaming] = React.useState(false);
   const [streamingText, setStreamingText] = React.useState("");
+  const [recording, setRecording] = React.useState(false);
+  const [transcribing, setTranscribing] = React.useState(false);
+  const [recordSeconds, setRecordSeconds] = React.useState(0);
   const [search, setSearch] = React.useState("");
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [showSidebar, setShowSidebar] = React.useState(false);
@@ -172,6 +178,11 @@ export function AiCoachClient({
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = React.useRef<Blob[]>([]);
+  const streamRef = React.useRef<MediaStream | null>(null);
+  const recordTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordSecondsRef = React.useRef(0);
 
   React.useEffect(() => {
     activeIdRef.current = activeId;
@@ -294,6 +305,128 @@ export function AiCoachClient({
     },
     [input, attachments, streaming, uploading, refreshConversations]
   );
+
+  const cleanupRecording = React.useCallback(() => {
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+    mediaRecorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    mediaChunksRef.current = [];
+    recordSecondsRef.current = 0;
+    setRecording(false);
+    setRecordSeconds(0);
+  }, []);
+
+  const stopAndTranscribe = React.useCallback(async () => {
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    const recorder = mediaRecorderRef.current;
+    const stream = streamRef.current;
+    mediaRecorderRef.current = null;
+    streamRef.current = null;
+    recordSecondsRef.current = 0;
+    setRecording(false);
+    setRecordSeconds(0);
+    stream?.getTracks().forEach((track) => track.stop());
+
+    if (!recorder || recorder.state === "inactive") {
+      mediaChunksRef.current = [];
+      return;
+    }
+
+    const chunks = mediaChunksRef.current;
+    mediaChunksRef.current = [];
+    const mimeType = recorder.mimeType || "audio/webm";
+    const blob = new Blob(chunks, { type: mimeType });
+    setTranscribing(true);
+
+    try {
+      const form = new FormData();
+      form.append(
+        "file",
+        blob,
+        `voice-${Date.now()}.${mimeType.includes("mp4") ? "m4a" : "webm"}`
+      );
+      const response = await fetch("/api/ai/transcribe", {
+        method: "POST",
+        body: form,
+      });
+      const body = (await response.json().catch(() => null)) as {
+        text?: string;
+        error?: string;
+      } | null;
+      if (!response.ok || !body?.text) {
+        toast.error(body?.error ?? "Transcription failed.");
+        return;
+      }
+      await send(body.text);
+    } catch {
+      toast.error("Transcription failed. Please try again.");
+    } finally {
+      setTranscribing(false);
+    }
+  }, [send]);
+
+  const startRecording = React.useCallback(async () => {
+    if (
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      toast.error("Voice recording isn't supported in this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      mediaChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) mediaChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        cleanupRecording();
+        toast.error("Recording failed. Please try again.");
+      };
+      recorder.start();
+      setRecording(true);
+      setRecordSeconds(0);
+      recordSecondsRef.current = 0;
+      recordTimerRef.current = setInterval(() => {
+        recordSecondsRef.current += 1;
+        setRecordSeconds(recordSecondsRef.current);
+        if (recordSecondsRef.current >= MAX_RECORD_SECONDS) {
+          stopAndTranscribe();
+        }
+      }, 1000);
+    } catch {
+      toast.error("Microphone access was denied. Enable it in your browser settings.");
+    }
+  }, [cleanupRecording, stopAndTranscribe]);
+
+  React.useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   const regenerate = React.useCallback(
     async (messageIndex: number) => {
@@ -649,6 +782,15 @@ export function AiCoachClient({
             )}
 
             <div className="flex items-end gap-2">
+              {recording && (
+                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive" />
+                  </span>
+                  Recording… {recordSeconds}s
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -663,9 +805,44 @@ export function AiCoachClient({
                 type="button"
                 size="icon"
                 variant="ghost"
+                className={cn(
+                  "h-[60px] w-[52px] shrink-0",
+                  recording ? "text-destructive" : "text-muted-foreground"
+                )}
+                onClick={() =>
+                  recording ? stopAndTranscribe() : startRecording()
+                }
+                disabled={
+                  streaming ||
+                  uploading ||
+                  transcribing ||
+                  attachments.length > 0 ||
+                  input.trim().length > 0
+                }
+                aria-label={recording ? "Stop recording" : "Record a voice message"}
+                title={recording ? "Stop recording" : "Record a voice message"}
+              >
+                {transcribing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : recording ? (
+                  <Square className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Mic className="h-4 w-4" aria-hidden />
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
                 className="h-[60px] w-[52px] shrink-0 text-muted-foreground"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
+                disabled={
+                  streaming ||
+                  uploading ||
+                  transcribing ||
+                  recording ||
+                  attachments.length >= MAX_ATTACHMENTS
+                }
                 aria-label="Attach a file"
               >
                 {uploading ? (
@@ -684,17 +861,23 @@ export function AiCoachClient({
                     send();
                   }
                 }}
-                placeholder="Ask anything — attach a photo or doc, or type a message"
+                placeholder="Ask anything — speak, attach a photo or doc, or type a message"
                 className="min-h-[60px] max-h-32 flex-1 resize-none"
                 rows={2}
-                disabled={streaming || uploading}
+                disabled={streaming || uploading || recording || transcribing}
                 aria-label="Message your AI coach"
               />
               <Button
                 type="submit"
                 size="icon"
                 className="h-[60px] w-[52px] shrink-0"
-                disabled={streaming || uploading || (!input.trim() && attachments.length === 0)}
+                disabled={
+                  streaming ||
+                  uploading ||
+                  recording ||
+                  transcribing ||
+                  (!input.trim() && attachments.length === 0)
+                }
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4" aria-hidden />
