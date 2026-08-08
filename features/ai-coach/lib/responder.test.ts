@@ -188,9 +188,15 @@ describe("answerDeterministically", () => {
     expect(reply.reply).toContain("weekly review");
   });
 
-  it("defaults to the weekly summary", () => {
-    const reply = answerDeterministically(makeContext(), "tell me something random");
+  it("defaults to the weekly summary for fitness talk", () => {
+    const reply = answerDeterministically(makeContext(), "tell me about my diet");
     expect(reply.reply).toContain("Recommended focus");
+  });
+
+  it("does not force a fitness summary onto off-topic questions", () => {
+    const reply = answerDeterministically(makeContext(), "what is the capital of France?");
+    expect(reply.reply).toContain("temporarily unavailable");
+    expect(reply.reply).not.toContain("Recommended focus");
   });
 });
 

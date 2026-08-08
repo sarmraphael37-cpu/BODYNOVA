@@ -458,6 +458,17 @@ export function answerDeterministically(
     };
   }
 
+  // Catch-all: if the message shows no coaching intent, don't force a fitness
+  // summary on it. The live AI answers global questions; offline mode is honest
+  // about that limitation.
+  if (!/\b(weight|workout|exercise|training|train|sleep|water|hydrat|step|habit|goal|calorie|protein|nutrition|diet|strength|cardio|muscle|fat|progres|consisten|recovery|recover|rest|stretch|yoga|run|jog|swim|cycle|squat|lunge|plank|push.?up|pull|bench|deadlift|gym|rep|set|meal|snack|fast)/i.test(question)) {
+    return {
+      reply: `I'd love to answer that! General questions need my full AI connection, which is temporarily unavailable. In the meantime I can still help with your fitness data — ask about your workouts, sleep, water, habits, or this week's progress.`,
+      actions: [{ id: "coach", label: "Open AI Coach", href: "/app/ai-coach" }],
+      confidence: "low",
+    };
+  }
+
   return {
     reply: week.yourWeek + `\n\nRecommended focus: ${week.recommendedFocus}.`,
     actions: [
