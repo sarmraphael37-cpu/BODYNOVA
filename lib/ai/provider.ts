@@ -128,6 +128,16 @@ export class OpenAiCompatibleProvider implements AiProvider {
     }
   }
 
+  /**
+   * Gemini 3.x models consume part of the output budget on internal reasoning,
+   * so a small max_tokens silently truncates replies. Give Gemini a generous
+   * ceiling and keep the caller's (cheaper) budget for other providers.
+   */
+  private resolveMaxTokens(requested?: number): number | undefined {
+    if (this.name === "gemini") return 8192;
+    return requested;
+  }
+
   async complete(params: AiCompleteParams): Promise<AiCompletion> {
     const body: Record<string, unknown> = {
       model: this.model,
@@ -136,7 +146,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       stream: false,
     };
     if (params.json) body.response_format = { type: "json_object" };
-    if (params.maxTokens) body.max_tokens = params.maxTokens;
+    const maxTokens = this.resolveMaxTokens(params.maxTokens);
+    if (maxTokens) body.max_tokens = maxTokens;
 
     const response = await this.request(body);
     const data = await response.json();
@@ -163,7 +174,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       temperature: params.temperature ?? 0.7,
       stream: true,
     };
-    if (params.maxTokens) body.max_tokens = params.maxTokens;
+    const maxTokens = this.resolveMaxTokens(params.maxTokens);
+    if (maxTokens) body.max_tokens = maxTokens;
 
     const response = await this.request(body, params.signal);
     if (!response.body) {
