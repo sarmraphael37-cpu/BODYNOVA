@@ -91,7 +91,7 @@ const AI_KEY_SOURCES: AiKeySource[] = [
     provider: "gemini",
     defaultBaseUrl:
       "https://generativelanguage.googleapis.com/v1beta/openai",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-3.5-flash",
   },
   {
     envName: "GROQ_API_KEY",

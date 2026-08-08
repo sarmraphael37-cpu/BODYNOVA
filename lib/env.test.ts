@@ -34,7 +34,7 @@ describe("AI provider detection", () => {
     expect(config.baseUrl).toBe(
       "https://generativelanguage.googleapis.com/v1beta/openai"
     );
-    expect(config.model).toBe("gemini-2.5-flash");
+    expect(config.model).toBe("gemini-3.5-flash");
   });
 
   it("detects GROQ_API_KEY with its defaults", () => {
